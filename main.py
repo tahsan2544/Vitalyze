@@ -19,6 +19,8 @@ Usage:
 """
 
 import argparse
+import json
+import os
 import sys
 import time
 from urllib.parse import urlparse
@@ -32,6 +34,8 @@ from vitalyze import caching
 from vitalyze import seo_basics
 from vitalyze import load_test
 from vitalyze import report
+from vitalyze import config as config_module
+from vitalyze import history
 from vitalyze import __version__
 
 BANNER = r"""
@@ -55,7 +59,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
         description="Vitalyze - measure a website's performance and health across categories.",
         epilog="Only run this against domains you own or are explicitly authorized to test.",
     )
-    parser.add_argument("url", help="Target URL, e.g. https://example.com")
+    parser.add_argument("url", nargs="?", default=None,
+                         help="Target URL, e.g. https://example.com (optional if set in --config)")
+    parser.add_argument("--config", metavar="FILE",
+                         help=f"Load settings from a JSON config file (default: ./{config_module.DEFAULT_CONFIG_FILENAME} if present)")
+    parser.add_argument("--save-config", metavar="FILE",
+                         help="Save this run's settings to a JSON config file for reuse")
     parser.add_argument("--version", action="version", version=f"Vitalyze {__version__}")
     parser.add_argument(
         "--runs", type=int, default=5,
@@ -90,11 +99,63 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--save", metavar="FILE",
         help="Save output to a file (used with --output json/html)"
     )
+    parser.add_argument(
+        "--history-db", metavar="FILE", default=history.DEFAULT_HISTORY_DB_FILENAME,
+        help=f"SQLite file for run history (default: ./{history.DEFAULT_HISTORY_DB_FILENAME})"
+    )
+    parser.add_argument(
+        "--no-history", action="store_true",
+        help="Don't record this run's scores to history"
+    )
+    parser.add_argument(
+        "--trend", action="store_true",
+        help="Compare this run's scores against the most recent previous run for this target"
+    )
+    parser.add_argument(
+        "--show-history", nargs="?", const=10, type=int, default=None, metavar="N",
+        help="Show the last N historical runs for this target (default 10) and exit without scanning"
+    )
     return parser
 
 
 def main():
-    args = build_arg_parser().parse_args()
+    parser = build_arg_parser()
+    args = parser.parse_args()
+
+    # --- Config file: load and apply as defaults, then re-parse so any
+    # flag actually typed on the command line still wins over the config ---
+    config_path = args.config or (
+        config_module.DEFAULT_CONFIG_FILENAME
+        if os.path.isfile(config_module.DEFAULT_CONFIG_FILENAME) else None
+    )
+    if config_path:
+        try:
+            config_data = config_module.load(config_path)
+        except ValueError as e:
+            print(f"[!] {e}")
+            sys.exit(1)
+        if config_data:
+            parser.set_defaults(**config_data)
+            args = parser.parse_args()  # re-parse: CLI flags override config defaults
+
+    if not args.url:
+        print("[!] No URL given on the command line or in a config file.")
+        sys.exit(1)
+
+    if args.skip:
+        invalid = set(args.skip) - set(ALL_CATEGORIES)
+        if invalid:
+            print(f"[!] Invalid --skip categories: {', '.join(sorted(invalid))}")
+            sys.exit(1)
+    if args.output not in ("console", "json", "html"):
+        print(f"[!] Invalid --output value: {args.output}")
+        sys.exit(1)
+
+    if args.save_config:
+        config_module.save(args.save_config, vars(args))
+        if args.output == "console":
+            print(f"[+] Settings saved to {args.save_config}")
+
     target = normalize_url(args.url)
     parsed = urlparse(target)
 
@@ -107,6 +168,19 @@ def main():
     if console:
         print(BANNER)
         print(f"Target: {target}")
+
+    # --- History query mode: show past runs and exit, no scan performed ---
+    if args.show_history is not None:
+        records = history.fetch_history(args.history_db, target, limit=args.show_history)
+        if console:
+            history.print_history_table(records, target)
+        elif args.output == "json":
+            print(json.dumps({"target": target, "history": records}, indent=2))
+        else:
+            print("[!] --show-history only supports --output console or json")
+        sys.exit(0)
+
+    if console:
         print(f"Started: {time.strftime('%Y-%m-%d %H:%M:%S')}")
         print("-" * 60)
 
@@ -209,8 +283,25 @@ def main():
     # --- Scoring + report ---
     results["scores"] = report.score(results)
 
+    # --- Trend: fetch the previous run BEFORE recording this one, or
+    # comparing a run against itself is impossible to avoid ---
+    if args.trend:
+        previous = history.previous_run(args.history_db, target)
+        if previous:
+            results["trend"] = history.compute_deltas(previous["scores"], results["scores"])
+            results["trend_previous_timestamp"] = previous["timestamp"]
+        else:
+            results["trend"] = None
+            results["trend_previous_timestamp"] = None
+
+    if not args.no_history:
+        history.record(args.history_db, target, parsed.netloc, results["timestamp"], results["scores"])
+
     if console:
         report.print_summary(results)
+        if args.trend:
+            print()
+            history.print_trend(results.get("trend"), results.get("trend_previous_timestamp"))
     elif args.output == "json":
         out = report.to_json(results)
         if args.save:

@@ -9,5 +9,7 @@ env/
 *.log
 vitalyze_report.html
 report.json
+vitalyze_history.db
+*.db
 .idea/
 .vscode/

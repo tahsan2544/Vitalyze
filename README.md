@@ -99,6 +99,33 @@ python main.py https://yoursite.com --load-test --confirm-authorized \
     --concurrency 10 --requests 100
 ```
 
+**Save your settings so you don't retype them:**
+```bash
+python main.py https://yoursite.com --runs 10 --skip seo --save-config vitalyze.config.json
+```
+
+**Reuse them next time — URL and flags all come from the file:**
+```bash
+python main.py --config vitalyze.config.json
+```
+
+A CLI flag always overrides the matching config value, so `python main.py --config vitalyze.config.json --runs 3` uses everything from the file except `runs`, which becomes `3` for that run. If a file named `vitalyze.config.json` exists in the current directory, it's picked up automatically — no `--config` needed.
+
+Note: `--save-config` records every effective setting for that run (including defaults like `--output console`), not just the flags you typed — so the file is a complete, unambiguous snapshot rather than a diff.
+
+**Track scores over time and compare against your last run:**
+```bash
+python main.py https://yoursite.com --trend
+```
+
+**Browse past runs without scanning again:**
+```bash
+python main.py https://yoursite.com --show-history        # last 10 runs
+python main.py https://yoursite.com --show-history 30      # last 30 runs
+```
+
+Every run is recorded to a local SQLite file (`vitalyze_history.db` by default — safe to `.gitignore`, back up, or delete any time). Turn it off per-run with `--no-history`, or point it at a different file with `--history-db path/to/file.db`.
+
 **Check the version:**
 ```bash
 python main.py --version
@@ -119,6 +146,12 @@ python main.py --version
 | `--requests` | `50` | Load test total requests (🔒 hard-capped at **500**) |
 | `--output` | `console` | `console`, `json`, or `html` |
 | `--save` | none | File path to save the JSON/HTML report |
+| `--config` | none | Load settings from a JSON config file (auto-detects `./vitalyze.config.json`) |
+| `--save-config` | none | Save this run's resolved settings to a JSON config file |
+| `--history-db` | `vitalyze_history.db` | SQLite file where run history is stored |
+| `--no-history` | off | Don't record this run's scores to history |
+| `--trend` | off | Compare this run against the most recent previous run for this target |
+| `--show-history [N]` | none | Show the last N runs (default 10) for this target and exit — no scan performed |
 | `--version` | — | Print the installed version and exit |
 
 ---
@@ -179,10 +212,12 @@ SUMMARY
 | `vitalyze/ssl_check.py` | Certificate inspection |
 | `vitalyze/security_headers.py` | Security header audit + cookie flag analysis |
 | `vitalyze/caching.py` | Cache-Control/ETag/Last-Modified analysis |
+| `vitalyze/config.py` | JSON config file load/save (`--config`/`--save-config`) |
+| `vitalyze/history.py` | SQLite-backed run history, trend comparison (`--trend`/`--show-history`) |
 | `vitalyze/seo_basics.py` | On-page SEO checks |
 | `vitalyze/load_test.py` | 🔒 Capped, single-target load test |
 | `vitalyze/report.py` | Scoring, letter grades, JSON/HTML export |
-| `tests/` | Unit tests (46 tests, all mocked — no real network needed) |
+| `tests/` | Unit tests (64 tests, all mocked — no real network needed) |
 | `.github/workflows/ci.yml` | Auto-runs tests on push/PR |
 | `ETHICAL_USE.md` | Responsible-use policy — read before load testing |
 
@@ -195,7 +230,7 @@ pip install pytest
 python -m pytest tests/ -v
 ```
 
-All 46 tests run against mocked sockets/HTTP responses — no live network calls, so they pass in CI or offline exactly the same way.
+All 64 tests run against mocked sockets/HTTP responses — no live network calls, so they pass in CI or offline exactly the same way.
 
 ---
 
@@ -203,10 +238,10 @@ All 46 tests run against mocked sockets/HTTP responses — no live network calls
 
 | Idea | Status |
 |---|---|
-| Historical run comparison (track scores over time) | 💭 planned |
-| Lighthouse / Core Web Vitals integration | 💭 planned |
-| Config file for repeated scans of owned targets | 💭 planned |
-| Slack/webhook alerts on score regressions | 💭 planned |
+| Slack/webhook alerts on score regressions | 🔜 next up |
+| Multi-page crawl (same host only, capped) | 💭 planned |
+| Core Web Vitals — heuristic estimate, not real LCP/CLS (needs a browser for that) | 💭 planned |
+| Screenshot capture — desktop only, won't run in Termux | 💭 planned |
 | IPv6-aware DNS/connect reporting | 💭 planned |
 
 ---
