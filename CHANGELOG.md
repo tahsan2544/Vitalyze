@@ -1,5 +1,39 @@
 # Changelog
 
+## v2.4.0
+
+**Webhook/Slack alerts** — the last of the originally requested feature
+batch. From here, the roadmap shifts to accuracy improvements over new
+features, per explicit direction.
+
+### Added
+- `vitalyze/alerts.py` — sends a notification to a webhook URL when the
+  score regresses. `--webhook-format slack` (default) sends Slack's
+  `{text: ...}` shape; `--webhook-format generic` sends raw
+  `{target, scores, trend}` JSON for a custom integration.
+- `--alert-threshold N` (default 10) — minimum point drop, in the overall
+  score or any single category, that triggers a send. `--alert-always`
+  overrides this to send every run regardless.
+- A security warning printed when `--save-config` and `--webhook` are used
+  together: a webhook URL is effectively a credential, and saving it to a
+  config file that later gets committed to a public repo would leak it.
+- 13 new unit tests (should-alert threshold logic, Slack text formatting,
+  generic payload shape, HTTP/connection error handling — all mocked, no
+  real network) plus 5 end-to-end integration tests: no alert on a
+  first-ever run (nothing to compare against), a real regression
+  triggering and sending, a sub-threshold drop correctly not triggering,
+  `--alert-always` forcing a send, and the webhook outcome appearing in
+  JSON output.
+
+### Changed
+- Trend is now computed internally whenever `--webhook` is set, even
+  without `--trend` — you don't need both flags for the alert logic to
+  work, only to also see the trend printed to console.
+- Roadmap re-prioritized around accuracy improvements (real HTML parsing,
+  header content-quality scoring, connection-reuse-aware timing) ahead of
+  the previously planned Core Web Vitals heuristic and screenshot capture,
+  per explicit "accuracy over features" direction.
+
 ## v2.3.0
 
 **Visual polish** — the console output now looks like a finished tool

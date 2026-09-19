@@ -16,6 +16,7 @@ CONFIGURABLE_KEYS = [
     "url", "runs", "skip", "load_test", "confirm_authorized",
     "concurrency", "requests", "output", "save",
     "history_db", "no_history", "trend", "no_color",
+    "webhook", "webhook_format", "alert_threshold", "alert_always",
 ]
 
 

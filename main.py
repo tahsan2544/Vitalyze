@@ -36,6 +36,7 @@ from vitalyze import load_test
 from vitalyze import report
 from vitalyze import config as config_module
 from vitalyze import history
+from vitalyze import alerts
 from vitalyze import colors
 from vitalyze import __version__
 
@@ -120,6 +121,22 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--no-color", action="store_true",
         help="Disable colored output (also auto-disabled when piping to a file, or via the NO_COLOR env var)"
     )
+    parser.add_argument(
+        "--webhook", metavar="URL",
+        help="Send a notification to this webhook URL when the score regresses (requires history)"
+    )
+    parser.add_argument(
+        "--webhook-format", choices=["slack", "generic"], default="slack",
+        help="Payload shape for --webhook: 'slack' for Slack-compatible {text}, 'generic' for raw JSON (default: slack)"
+    )
+    parser.add_argument(
+        "--alert-threshold", type=int, default=10, metavar="N",
+        help="Minimum point drop (overall or any category) to trigger a --webhook alert (default: 10)"
+    )
+    parser.add_argument(
+        "--alert-always", action="store_true",
+        help="Send the --webhook notification every run, not only on a regression"
+    )
     return parser
 
 
@@ -156,14 +173,18 @@ def main():
         print(f"[!] Invalid --output value: {args.output}")
         sys.exit(1)
 
+    console = args.output == "console"
+    if args.no_color or not console:
+        colors.disable()
+
     if args.save_config:
         config_module.save(args.save_config, vars(args))
         if args.output == "console":
             print(f"[+] Settings saved to {args.save_config}")
-
-    console = args.output == "console"
-    if args.no_color or not console:
-        colors.disable()
+            if args.webhook:
+                warning = ("Your config file now contains a webhook URL. Slack/webhook URLs "
+                            "act like a password — don't commit this file to a public repo.")
+                print(f"    {colors.warn(warning)}")
 
     target = normalize_url(args.url)
     parsed = urlparse(target)
@@ -291,8 +312,9 @@ def main():
     results["scores"] = report.score(results)
 
     # --- Trend: fetch the previous run BEFORE recording this one, or
-    # comparing a run against itself is impossible to avoid ---
-    if args.trend:
+    # comparing a run against itself is impossible to avoid. Needed both
+    # for --trend display and for --webhook's regression check. ---
+    if args.trend or args.webhook:
         previous = history.previous_run(args.history_db, target)
         if previous:
             results["trend"] = history.compute_deltas(previous["scores"], results["scores"])
@@ -304,11 +326,29 @@ def main():
     if not args.no_history:
         history.record(args.history_db, target, parsed.netloc, results["timestamp"], results["scores"])
 
+    # --- Webhook alert: only fires on a real regression unless --alert-always ---
+    if args.webhook:
+        trend = results.get("trend")
+        triggered = args.alert_always or alerts.should_alert(trend, args.alert_threshold)
+        results["webhook"] = {"attempted": triggered, "success": None, "error": None}
+        if triggered:
+            outcome = alerts.send_webhook(
+                args.webhook, target, results["scores"], trend, webhook_format=args.webhook_format
+            )
+            results["webhook"]["success"] = outcome["success"]
+            results["webhook"]["error"] = outcome["error"]
+
     if console:
         report.print_summary(results)
         if args.trend:
             print()
             history.print_trend(results.get("trend"), results.get("trend_previous_timestamp"))
+        if args.webhook and results["webhook"]["attempted"]:
+            if results["webhook"]["success"]:
+                print(f"\n{colors.ok('Webhook notification sent')}")
+            else:
+                message = f"Webhook notification failed: {results['webhook']['error']}"
+                print(f"\n{colors.warn(message)}")
     elif args.output == "json":
         out = report.to_json(results)
         if args.save:

@@ -40,6 +40,7 @@ Read [`ETHICAL_USE.md`](ETHICAL_USE.md) before using `--load-test`. The caps are
 | 🅰️ **Letter grades** | Every score now also shows as A–F at a glance |
 | ⚙️ **Config files** | `--save-config` / `--config` — reuse a target and flags without retyping them |
 | 📜 **History tracking** | Every run is recorded locally; `--trend` compares against your last run, `--show-history` browses past runs |
+| 🔔 **Webhook/Slack alerts** | `--webhook` notifies you (only on a real regression, by default) when a score drops |
 | 🎨 **Colored, readable console output** | ✓/✗/⚠ icons and color-coded scores replace plain `[OK]`/`[--]` text tags; a plain-language verdict line ("Good", "Needs work", etc.) sits under the score summary — auto-disables when piping to a file or via `--no-color` |
 
 ---
@@ -134,6 +135,15 @@ Every run is recorded to a local SQLite file (`vitalyze_history.db` by default �
 python main.py --version
 ```
 
+**Get a Slack notification when your score regresses:**
+```bash
+python main.py https://yoursite.com --webhook https://hooks.slack.com/services/xxx/yyy/zzz
+```
+
+Only sends when the overall score (or any single category) drops by 10+ points versus your last run (`--alert-threshold` to change that) — not every run. Use `--alert-always` to notify unconditionally, or `--webhook-format generic` to send raw JSON to a non-Slack endpoint instead of Slack's `{text: ...}` shape.
+
+⚠️ **A webhook URL is effectively a password** — anyone who has it can post to your channel. If you `--save-config` alongside `--webhook`, don't commit that config file to a public repo (Vitalyze will warn you if you do this in one command).
+
 ---
 
 ## 🎛️ CLI options
@@ -156,6 +166,10 @@ python main.py --version
 | `--trend` | off | Compare this run against the most recent previous run for this target |
 | `--show-history [N]` | none | Show the last N runs (default 10) for this target and exit — no scan performed |
 | `--no-color` | off | Disable colored output (auto-disabled anyway when piping to a file, or via `NO_COLOR` env var) |
+| `--webhook` | none | URL to notify (Slack-compatible by default) when the score regresses |
+| `--webhook-format` | `slack` | `slack` for `{text: ...}`, or `generic` for raw `{target, scores, trend}` JSON |
+| `--alert-threshold` | `10` | Minimum point drop (overall or any category) that triggers `--webhook` |
+| `--alert-always` | off | Send the `--webhook` notification every run, not just on a regression |
 | `--version` | — | Print the installed version and exit |
 
 ---
@@ -224,10 +238,11 @@ SUMMARY
 | `vitalyze/config.py` | JSON config file load/save (`--config`/`--save-config`) |
 | `vitalyze/history.py` | SQLite-backed run history, trend comparison (`--trend`/`--show-history`) |
 | `vitalyze/colors.py` | ANSI color helpers for console output (auto-detects TTY, respects `NO_COLOR`) |
+| `vitalyze/alerts.py` | Slack/webhook notifications on score regression (`--webhook`) |
 | `vitalyze/seo_basics.py` | On-page SEO checks |
 | `vitalyze/load_test.py` | 🔒 Capped, single-target load test |
 | `vitalyze/report.py` | Scoring, letter grades, JSON/HTML export |
-| `tests/` | Unit tests (72 tests, all mocked — no real network needed) |
+| `tests/` | Unit tests (85 tests, all mocked — no real network needed) |
 | `.github/workflows/ci.yml` | Auto-runs tests on push/PR |
 | `ETHICAL_USE.md` | Responsible-use policy — read before load testing |
 
@@ -240,18 +255,23 @@ pip install pytest
 python -m pytest tests/ -v
 ```
 
-All 72 tests run against mocked sockets/HTTP responses — no live network calls, so they pass in CI or offline exactly the same way.
+All 85 tests run against mocked sockets/HTTP responses — no live network calls, so they pass in CI or offline exactly the same way.
 
 ---
 
 ## 🛣️ Roadmap
 
+Given accuracy is the priority, these are now ranked by what actually
+improves the correctness of a rating — not just what adds a new checkbox:
+
 | Idea | Status |
 |---|---|
-| Slack/webhook alerts on score regressions | 🔜 next up |
+| **Accuracy: real HTML parser instead of regex** for title/meta/canonical detection — regex can misfire on real-world malformed HTML (multi-line tags, unusual quoting) | 🔜 candidate |
+| **Accuracy: score header *content*, not just presence** — a wide-open `Content-Security-Policy: default-src *` currently scores identically to a strict, well-scoped one | 🔜 candidate |
+| **Accuracy: connection-reuse-aware timing mode** — every measurement currently pays a full cold TCP+TLS handshake, since each request uses `Connection: close`; real browsers reuse connections, so real-world page loads are faster than what's reported today | 🔜 candidate |
 | Multi-page crawl (same host only, capped) | 💭 planned |
-| Core Web Vitals — heuristic estimate, not real LCP/CLS (needs a browser for that) | 💭 planned |
-| Screenshot capture — desktop only, won't run in Termux | 💭 planned |
+| Core Web Vitals — heuristic estimate only, not real LCP/CLS (needs a browser for that) | 💭 lower priority — see accuracy note |
+| Screenshot capture — desktop only, won't run in Termux | 💭 lower priority — see accuracy note |
 | IPv6-aware DNS/connect reporting | 💭 planned |
 
 ---
