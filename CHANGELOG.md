@@ -1,5 +1,45 @@
 # Changelog
 
+## v2.3.0
+
+**Visual polish** — the console output now looks like a finished tool
+instead of a debug log: colors, icons, and a plain-language verdict, not
+just numbers.
+
+### Added
+- `vitalyze/colors.py` — ANSI color helpers. On by default in a real
+  terminal, auto-off when piping to a file or when `NO_COLOR` is set
+  (https://no-color.org/), and always off in JSON/HTML output (which never
+  touch this module at all — the raw results dict stays plain data).
+- `--no-color` flag to force colors off regardless of terminal detection.
+- ✓ / ✗ / ⚠ icons replacing the old `[OK]` / `[--]` / `[x]` / `[!]` text
+  tags across every check module: DNS, redirects, SSL, security headers,
+  caching, SEO, load test, and history trend arrows.
+- Colored score bars, numbers, and letter grades in the console summary.
+- A plain-language verdict line under the score summary — "Excellent",
+  "Good", "Fair", "Needs work", or "Poor" — instead of leaving the
+  numbers to speak for themselves.
+- Colored grade badges in the HTML report (was one flat static gradient
+  before) plus the same verdict line.
+- 6 new unit tests for the color module (enabled/disabled state, score
+  thresholds, icon presence) plus 2 new tests in `test_report.py`
+  (verdict thresholds, and a regression guard for the alignment bug
+  described below).
+
+### Fixed
+- **Column alignment bug**: coloring a label *before* padding it (e.g.
+  `f"{colors.bold(text):<18}"`) throws off visual alignment, because
+  Python's `:<N` padding counts the invisible ANSI escape bytes toward the
+  string's length. Every colored/padded line was restructured to pad the
+  plain text first, then wrap the already-padded result in color.
+- **Python 3.8–3.11 compatibility**: caught and fixed two places using a
+  nested f-string with an escaped quote inside the outer f-string's
+  expression (e.g. `f"...{fn(f'...\\"...\\"...')}"`). This is valid only
+  on Python 3.12+ (PEP 701) — on 3.8–3.11 it's a hard `SyntaxError`. This
+  sandbox runs 3.12, so `py_compile` didn't catch it; found by manually
+  grepping for the pattern across the codebase, since the README commits
+  to 3.8+ support and Termux/older systems could hit it.
+
 ## v2.2.0
 
 **History tracking** — second upgrade in the planned batch (webhook alerts,

@@ -10,6 +10,8 @@ import os
 import sqlite3
 import time
 
+from . import colors
+
 DEFAULT_HISTORY_DB_FILENAME = "vitalyze_history.db"
 
 
@@ -83,10 +85,10 @@ def compute_deltas(previous_scores: dict, current_scores: dict) -> dict:
 
 def _arrow(delta: int) -> str:
     if delta > 0:
-        return "^"
+        return colors.green(f"{colors.UP} +{delta}")
     if delta < 0:
-        return "v"
-    return "="
+        return colors.red(f"{colors.DOWN} {delta}")
+    return colors.dim(f"{colors.FLAT} +0")
 
 
 def print_trend(trend: dict, previous_timestamp: float) -> None:
@@ -99,10 +101,10 @@ def print_trend(trend: dict, previous_timestamp: float) -> None:
     for category, delta in sorted(trend.items()):
         if category == "overall":
             continue
-        print(f"      {category:<18} {_arrow(delta)} {delta:+d}")
+        print(f"      {category:<18} {_arrow(delta)}")
     if "overall" in trend:
-        delta = trend["overall"]
-        print(f"      {'OVERALL':<18} {_arrow(delta)} {delta:+d}")
+        overall_label = colors.bold(f"{'OVERALL':<18}")
+        print(f"      {overall_label} {_arrow(trend['overall'])}")
 
 
 def print_history_table(records: list, target: str) -> None:
@@ -119,4 +121,6 @@ def print_history_table(records: list, target: str) -> None:
         overall = rec["scores"].get("overall")
         letter = report.grade(overall) if overall is not None else "N/A"
         others = ", ".join(f"{k}={v}" for k, v in rec["scores"].items() if k != "overall")
-        print(f"      {ts_str}   overall={overall} [{letter}]   ({others})")
+        overall_colored = colors.score_color(overall) if overall is not None else "N/A"
+        letter_colored = colors.color_for_score(overall)(letter) if overall is not None else letter
+        print(f"      {ts_str}   overall={overall_colored} [{letter_colored}]   ({others})")

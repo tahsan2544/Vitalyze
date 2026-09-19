@@ -38,6 +38,9 @@ Read [`ETHICAL_USE.md`](ETHICAL_USE.md) before using `--load-test`. The caps are
 | 🍪 **Cookie security analysis** | Flags cookies missing `Secure`, `HttpOnly`, or `SameSite` |
 | 📦 **Caching analysis** | Reports `Cache-Control`, `ETag`, `Last-Modified`, `Vary`, and whether a response is actually cacheable |
 | 🅰️ **Letter grades** | Every score now also shows as A–F at a glance |
+| ⚙️ **Config files** | `--save-config` / `--config` — reuse a target and flags without retyping them |
+| 📜 **History tracking** | Every run is recorded locally; `--trend` compares against your last run, `--show-history` browses past runs |
+| 🎨 **Colored, readable console output** | ✓/✗/⚠ icons and color-coded scores replace plain `[OK]`/`[--]` text tags; a plain-language verdict line ("Good", "Needs work", etc.) sits under the score summary — auto-disables when piping to a file or via `--no-color` |
 
 ---
 
@@ -152,20 +155,24 @@ python main.py --version
 | `--no-history` | off | Don't record this run's scores to history |
 | `--trend` | off | Compare this run against the most recent previous run for this target |
 | `--show-history [N]` | none | Show the last N runs (default 10) for this target and exit — no scan performed |
+| `--no-color` | off | Disable colored output (auto-disabled anyway when piping to a file, or via `NO_COLOR` env var) |
 | `--version` | — | Print the installed version and exit |
 
 ---
 
 ## 🖥️ Example output
 
+*(In a real terminal, ✓/✗/⚠ and scores render in green/yellow/red — shown plain here since Markdown can't display ANSI colors.)*
+
 ```
 [1] DNS Resolution
+    ✓ Resolved
     Host:          example.com
     Addresses:     93.184.216.34
     Resolve time:  12.4 ms
 
 [2] Redirect Chain
-    No redirects — direct 2xx/4xx/5xx response.
+    ✓ No redirects — direct 2xx/4xx/5xx response.
 
 [3] Response Time
     Runs completed:   5 (failed: 0)
@@ -195,6 +202,8 @@ SUMMARY
 ------------------------------------------------------------
   OVERALL             [################----] 84/100  [B]
 ============================================================
+  Good — solid overall, a few things worth polishing.
+============================================================
 ```
 
 ---
@@ -214,10 +223,11 @@ SUMMARY
 | `vitalyze/caching.py` | Cache-Control/ETag/Last-Modified analysis |
 | `vitalyze/config.py` | JSON config file load/save (`--config`/`--save-config`) |
 | `vitalyze/history.py` | SQLite-backed run history, trend comparison (`--trend`/`--show-history`) |
+| `vitalyze/colors.py` | ANSI color helpers for console output (auto-detects TTY, respects `NO_COLOR`) |
 | `vitalyze/seo_basics.py` | On-page SEO checks |
 | `vitalyze/load_test.py` | 🔒 Capped, single-target load test |
 | `vitalyze/report.py` | Scoring, letter grades, JSON/HTML export |
-| `tests/` | Unit tests (64 tests, all mocked — no real network needed) |
+| `tests/` | Unit tests (72 tests, all mocked — no real network needed) |
 | `.github/workflows/ci.yml` | Auto-runs tests on push/PR |
 | `ETHICAL_USE.md` | Responsible-use policy — read before load testing |
 
@@ -230,7 +240,7 @@ pip install pytest
 python -m pytest tests/ -v
 ```
 
-All 64 tests run against mocked sockets/HTTP responses — no live network calls, so they pass in CI or offline exactly the same way.
+All 72 tests run against mocked sockets/HTTP responses — no live network calls, so they pass in CI or offline exactly the same way.
 
 ---
 

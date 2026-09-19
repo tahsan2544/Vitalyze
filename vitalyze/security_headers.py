@@ -5,6 +5,8 @@ import re
 
 import requests
 
+from . import colors
+
 CHECKED_HEADERS = {
     "Strict-Transport-Security": "Forces HTTPS, prevents downgrade attacks",
     "Content-Security-Policy": "Mitigates XSS and data injection attacks",
@@ -97,18 +99,21 @@ def _analyze_cookies(resp) -> list:
 
 def print_result(result: dict) -> None:
     if not result["success"]:
-        print(f"    [x] Header check failed: {result['error']}")
+        message = f"Header check failed: {result['error']}"
+        print(f"    {colors.bad(message)}")
         return
 
     print(f"    Server header:  {result['server']}")
     print(f"    Compression:    {result['content_encoding']}")
-    print(f"    Score:          {result['score']}/100 "
-          f"(headers + cookie hygiene, penalty: -{result['cookie_penalty']})")
+    penalty_note = f"(headers + cookie hygiene, penalty: -{result['cookie_penalty']})"
+    print(f"    Score:          {colors.score_color(result['score'])}/100 {penalty_note}")
     for header, value in result["headers_present"].items():
         shown = value if len(value) < 60 else value[:57] + "..."
-        print(f"      [OK] {header}: {shown}")
+        line = f"{header}: {shown}"
+        print(f"      {colors.ok(line)}")
     for item in result["headers_missing"]:
-        print(f"      [--] {item['header']} missing ({item['purpose']})")
+        line = f"{item['header']} missing ({item['purpose']})"
+        print(f"      {colors.bad(line)}")
 
     if result["cookies"]:
         print("    Cookies:")
@@ -120,6 +125,8 @@ def print_result(result: dict) -> None:
                 flags.append("missing HttpOnly")
             if not c["samesite"]:
                 flags.append("missing SameSite")
-            status = "OK" if not flags else "!!"
-            issue_note = f" ({', '.join(flags)})" if flags else ""
-            print(f"      [{status}] {c['name']}{issue_note}")
+            if flags:
+                line = f"{c['name']} ({', '.join(flags)})"
+                print(f"      {colors.warn(line)}")
+            else:
+                print(f"      {colors.ok(c['name'])}")

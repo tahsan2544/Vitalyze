@@ -3,6 +3,8 @@
 import json
 import time
 
+from . import colors
+
 
 def score(results: dict) -> dict:
     scores = {}
@@ -101,9 +103,25 @@ def _linear_score(value, best, worst):
     return round(100 * (worst - value) / (worst - best))
 
 
+def verdict(overall_score) -> str:
+    """A plain-language read of the overall score, so a number doesn't have
+    to speak for itself."""
+    if overall_score is None:
+        return "No scoreable results."
+    if overall_score >= 90:
+        return "Excellent — this is in great shape."
+    if overall_score >= 80:
+        return "Good — solid overall, a few things worth polishing."
+    if overall_score >= 60:
+        return "Fair — functional, but some real issues to address."
+    if overall_score >= 40:
+        return "Needs work — several categories need attention."
+    return "Poor — significant issues across multiple categories."
+
+
 def print_summary(results: dict) -> None:
     print("\n" + "=" * 60)
-    print("SUMMARY")
+    print(colors.bold("SUMMARY"))
     print("=" * 60)
     scores = results.get("scores", {})
     if not scores:
@@ -112,11 +130,18 @@ def print_summary(results: dict) -> None:
     for category, value in scores.items():
         if category == "overall":
             continue
-        bar = _bar(value)
-        print(f"  {category:<18} {bar} {value}/100  [{grade(value)}]")
+        color_fn = colors.color_for_score(value)
+        bar = color_fn(_bar(value))
+        print(f"  {category:<18} {bar} {color_fn(f'{value}/100')}  [{color_fn(grade(value))}]")
     print("-" * 60)
     overall = scores.get("overall", 0)
-    print(f"  {'OVERALL':<18} {_bar(overall)} {overall}/100  [{grade(overall)}]")
+    color_fn = colors.color_for_score(overall)
+    overall_label = colors.bold(f"{'OVERALL':<18}")  # pad before coloring, not after —
+    # ANSI escape bytes count toward len() and would throw off :<N alignment otherwise
+    print(f"  {overall_label} {color_fn(_bar(overall))} "
+          f"{color_fn(f'{overall}/100')}  [{color_fn(grade(overall))}]")
+    print("=" * 60)
+    print(f"  {verdict(overall)}")
     print("=" * 60)
 
 
@@ -131,13 +156,25 @@ def to_json(results: dict) -> str:
 
 def to_html(results: dict) -> str:
     scores = results.get("scores", {})
+
+    def badge_color(val):
+        if val >= 80:
+            return "#4ade80"
+        if val >= 50:
+            return "#facc15"
+        return "#f87171"
+
     rows = "".join(
-        f"<tr><td>{cat}</td><td><div class='bar'><div class='fill' style='width:{val}%'></div></div></td>"
-        f"<td>{val}/100</td><td>{grade(val)}</td></tr>"
+        f"<tr><td>{cat}</td>"
+        f"<td><div class='bar'><div class='fill' style='width:{val}%; background:{badge_color(val)}'></div></div></td>"
+        f"<td style='color:{badge_color(val)}'>{val}/100</td>"
+        f"<td><span class='badge' style='background:{badge_color(val)}'>{grade(val)}</span></td></tr>"
         for cat, val in scores.items() if cat != "overall"
     )
     overall = scores.get("overall", "N/A")
     overall_grade = grade(overall) if isinstance(overall, int) else "N/A"
+    overall_color = badge_color(overall) if isinstance(overall, int) else "#999"
+    overall_verdict = verdict(overall) if isinstance(overall, int) else ""
     generated = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(results.get("timestamp", time.time())))
 
     return f"""<!DOCTYPE html>
@@ -149,11 +186,13 @@ def to_html(results: dict) -> str:
   body {{ font-family: -apple-system, Segoe UI, Roboto, sans-serif; background: #0f1115; color: #e6e6e6; padding: 2rem; max-width: 900px; margin: auto; }}
   h1 {{ font-size: 1.4rem; }}
   .meta {{ color: #999; margin-bottom: 2rem; }}
-  .overall {{ font-size: 3rem; font-weight: bold; color: {"#4ade80" if isinstance(overall, int) and overall >= 80 else "#facc15" if isinstance(overall, int) and overall >= 50 else "#f87171"}; }}
+  .overall {{ font-size: 3rem; font-weight: bold; color: {overall_color}; }}
+  .verdict {{ font-size: 1.1rem; color: #ccc; margin-top: 0.25rem; margin-bottom: 1rem; }}
   table {{ width: 100%; border-collapse: collapse; margin-top: 1.5rem; }}
   td {{ padding: 0.6rem 0.4rem; border-bottom: 1px solid #262a33; }}
   .bar {{ background: #262a33; border-radius: 4px; height: 10px; width: 200px; overflow: hidden; }}
-  .fill {{ background: linear-gradient(90deg, #4ade80, #facc15); height: 100%; }}
+  .fill {{ height: 100%; transition: width 0.3s ease; }}
+  .badge {{ display: inline-block; min-width: 1.6rem; text-align: center; padding: 0.1rem 0.5rem; border-radius: 6px; color: #0f1115; font-weight: bold; }}
   pre {{ background: #1a1d24; padding: 1rem; border-radius: 8px; overflow-x: auto; font-size: 0.8rem; }}
 </style>
 </head>
@@ -161,6 +200,7 @@ def to_html(results: dict) -> str:
   <h1>Vitalyze Report</h1>
   <div class="meta">Target: {results.get('target', '')} &middot; Generated: {generated}</div>
   <div class="overall">{overall}/100 <span style="font-size:1.2rem;">({overall_grade})</span></div>
+  <div class="verdict">{overall_verdict}</div>
   <table>{rows}</table>
   <h2>Raw Results</h2>
   <pre>{json.dumps(results, indent=2, default=str)}</pre>

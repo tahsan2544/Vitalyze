@@ -3,6 +3,8 @@
 import socket
 import time
 
+from . import colors
+
 
 def run(hostname: str) -> dict:
     hostname = hostname.split(":")[0]  # strip port if present
@@ -27,8 +29,10 @@ def run(hostname: str) -> dict:
 
 def print_result(result: dict) -> None:
     if not result["resolved"]:
-        print(f"    [x] Failed to resolve {result['hostname']}: {result['error']}")
+        message = f"Failed to resolve {result['hostname']}: {result['error']}"
+        print(f"    {colors.bad(message)}")
         return
+    print(f"    {colors.ok('Resolved')}")
     print(f"    Host:          {result['hostname']}")
     print(f"    Addresses:     {', '.join(result['addresses'])}")
     print(f"    Resolve time:  {result['resolve_time_ms']} ms")

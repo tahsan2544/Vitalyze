@@ -36,6 +36,7 @@ from vitalyze import load_test
 from vitalyze import report
 from vitalyze import config as config_module
 from vitalyze import history
+from vitalyze import colors
 from vitalyze import __version__
 
 BANNER = r"""
@@ -115,6 +116,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--show-history", nargs="?", const=10, type=int, default=None, metavar="N",
         help="Show the last N historical runs for this target (default 10) and exit without scanning"
     )
+    parser.add_argument(
+        "--no-color", action="store_true",
+        help="Disable colored output (also auto-disabled when piping to a file, or via the NO_COLOR env var)"
+    )
     return parser
 
 
@@ -156,14 +161,16 @@ def main():
         if args.output == "console":
             print(f"[+] Settings saved to {args.save_config}")
 
+    console = args.output == "console"
+    if args.no_color or not console:
+        colors.disable()
+
     target = normalize_url(args.url)
     parsed = urlparse(target)
 
     if not parsed.netloc:
         print(f"[!] Could not parse a valid host from: {args.url}")
         sys.exit(1)
-
-    console = args.output == "console"
 
     if console:
         print(BANNER)

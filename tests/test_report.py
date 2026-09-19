@@ -107,6 +107,41 @@ def test_grade_boundaries():
     assert report.grade(None) == "N/A"
 
 
+def test_verdict_thresholds():
+    assert "Excellent" in report.verdict(95)
+    assert "Good" in report.verdict(85)
+    assert "Fair" in report.verdict(65)
+    assert "Needs work" in report.verdict(45)
+    assert "Poor" in report.verdict(20)
+    assert "No scoreable" in report.verdict(None)
+
+
+def test_print_summary_bars_align_with_colors_enabled():
+    """ANSI escape codes count toward len() — a naive f-string padding
+    applied AFTER coloring text would misalign the bars. This guards
+    against that regression."""
+    import io
+    import re
+    from vitalyze import colors
+
+    colors.enable()
+    try:
+        buf = io.StringIO()
+        old_stdout = sys.stdout
+        sys.stdout = buf
+        try:
+            report.print_summary({"scores": {"seo": 80, "ssl": 100, "overall": 90}})
+        finally:
+            sys.stdout = old_stdout
+    finally:
+        colors.disable()
+
+    stripped = re.sub(r"\033\[[0-9;]*m", "", buf.getvalue())
+    lines = [l for l in stripped.split("\n") if "OVERALL" in l or "seo" in l or "ssl" in l]
+    bar_positions = [l.index("[") for l in lines]
+    assert len(set(bar_positions)) == 1, f"misaligned bars: {bar_positions}"
+
+
 if __name__ == "__main__":
     import pytest
     pytest.main([__file__, "-v"])

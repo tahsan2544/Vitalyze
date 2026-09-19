@@ -5,6 +5,8 @@ from urllib.parse import urljoin
 
 import requests
 
+from . import colors
+
 
 def run(url: str, timeout: int = 15) -> dict:
     result = {"success": False, "error": None}
@@ -61,14 +63,19 @@ def _check_url_exists(url: str, timeout: int) -> bool:
 
 def print_result(result: dict) -> None:
     if not result["success"]:
-        print(f"    [x] SEO check failed: {result['error']}")
+        message = f"SEO check failed: {result['error']}"
+        print(f"    {colors.bad(message)}")
         return
 
+    def yn(flag, good_text="yes", bad_text="no"):
+        return colors.ok(good_text) if flag else colors.warn(bad_text)
+
     print(f"    Title:            {result['title']!r} ({result['title_length']} chars)")
-    print(f"    Meta description: {'present' if result['meta_description'] else 'MISSING'} "
-          f"({result['meta_description_length']} chars)")
+    desc_text = "present" if result["meta_description"] else "MISSING"
+    desc_colored = colors.ok(desc_text) if result["meta_description"] else colors.bad(desc_text)
+    print(f"    Meta description: {desc_colored} ({result['meta_description_length']} chars)")
     print(f"    H1 tags:          {result['h1_count']}")
-    print(f"    Viewport meta:    {'yes' if result['has_viewport_meta'] else 'no'}")
-    print(f"    Canonical tag:    {'yes' if result['has_canonical'] else 'no'}")
-    print(f"    robots.txt:       {'found' if result['robots_txt_found'] else 'not found'}")
-    print(f"    sitemap.xml:      {'found' if result['sitemap_xml_found'] else 'not found'}")
+    print(f"    Viewport meta:    {yn(result['has_viewport_meta'])}")
+    print(f"    Canonical tag:    {yn(result['has_canonical'])}")
+    print(f"    robots.txt:       {yn(result['robots_txt_found'], 'found', 'not found')}")
+    print(f"    sitemap.xml:      {yn(result['sitemap_xml_found'], 'found', 'not found')}")

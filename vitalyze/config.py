@@ -15,7 +15,7 @@ DEFAULT_CONFIG_FILENAME = "vitalyze.config.json"
 CONFIGURABLE_KEYS = [
     "url", "runs", "skip", "load_test", "confirm_authorized",
     "concurrency", "requests", "output", "save",
-    "history_db", "no_history", "trend",
+    "history_db", "no_history", "trend", "no_color",
 ]
 
 

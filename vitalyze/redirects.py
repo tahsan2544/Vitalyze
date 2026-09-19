@@ -6,6 +6,8 @@ from urllib.parse import urljoin
 
 import requests
 
+from . import colors
+
 MAX_HOPS = 10
 
 
@@ -67,20 +69,24 @@ def _upgrades_to_https(hops) -> bool:
 
 def print_result(result: dict) -> None:
     if not result["success"]:
-        print(f"    [x] Redirect check failed: {result['error']}")
+        message = f"Redirect check failed: {result['error']}"
+        print(f"    {colors.bad(message)}")
         return
 
     if result["hop_count"] == 0:
-        print("    No redirects — direct 2xx/4xx/5xx response.")
+        print(f"    {colors.ok('No redirects')} — direct 2xx/4xx/5xx response.")
         return
 
     print(f"    Redirect hops:    {result['hop_count']}")
     print(f"    Total time:       {result['total_redirect_time_ms']} ms")
-    print(f"    HTTP -> HTTPS:    {'yes' if result['http_upgraded_to_https'] else 'no'}")
+    upgrade_text = "yes" if result["http_upgraded_to_https"] else "no"
+    upgrade_line = colors.ok(upgrade_text) if result["http_upgraded_to_https"] else upgrade_text
+    print(f"    HTTP -> HTTPS:    {upgrade_line}")
     for i, hop in enumerate(result["hops"]):
         arrow = "  ->" if i > 0 else "    "
         print(f"    {arrow} [{hop['status_code']}] {hop['url']} ({hop['time_ms']} ms)")
     print(f"    Final URL:        {result['final_url']}")
 
     if result["hop_count"] >= 3:
-        print(f"    [!] {result['hop_count']} redirects adds noticeable latency — consider flattening the chain")
+        message = f"{result['hop_count']} redirects adds noticeable latency — consider flattening the chain"
+        print(f"    {colors.warn(message)}")

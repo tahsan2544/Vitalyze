@@ -4,6 +4,8 @@ import socket
 import ssl
 from datetime import datetime, timezone
 
+from . import colors
+
 
 def run(netloc: str, timeout: int = 10) -> dict:
     host = netloc.split(":")[0]
@@ -50,11 +52,16 @@ def run(netloc: str, timeout: int = 10) -> dict:
 
 def print_result(result: dict) -> None:
     if not result["success"]:
-        print(f"    [x] SSL check failed: {result['error']}")
+        message = f"SSL check failed: {result['error']}"
+        print(f"    {colors.bad(message)}")
         return
+    if result["days_remaining"] < 0:
+        print(f"    {colors.bad('Certificate has expired')}")
+    elif result["expiring_soon"]:
+        print(f"    {colors.warn('Certificate expires soon')}")
+    else:
+        print(f"    {colors.ok('Certificate valid')}")
     print(f"    Protocol:       {result['protocol']} ({result['cipher_suite']})")
     print(f"    Issued to:      {result['issued_to']}")
     print(f"    Issued by:      {result['issued_by']}")
     print(f"    Valid until:    {result['valid_until']} ({result['days_remaining']} days remaining)")
-    if result["expiring_soon"]:
-        print("    [!] Certificate expires in under 30 days")

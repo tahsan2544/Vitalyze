@@ -23,6 +23,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import requests
 
 from . import stats_utils
+from . import colors
 
 MAX_CONCURRENCY = 20
 MAX_REQUESTS = 500
@@ -88,14 +89,16 @@ def print_result(result: dict) -> None:
     lat = result["latency_ms"]
     print(f"    Requests sent:     {result['total_requests']} @ concurrency {result['concurrency']}")
     print(f"    Wall time:         {result['wall_time_sec']}s ({result['requests_per_sec']} req/s)")
-    print(f"    Success/Error:     {result['success_count']}/{result['error_count']} "
-          f"({result['error_rate_pct']}% error rate)")
+    success_line = f"{result['success_count']}/{result['error_count']} ({result['error_rate_pct']}% error rate)"
+    color_fn = colors.color_for_score(round(100 - result["error_rate_pct"]))
+    print(f"    Success/Error:     {color_fn(success_line)}")
     print(f"    Status codes:      {result['status_code_distribution']}")
     if lat:
         print(f"    Latency (ms):      avg={lat['avg']} median={lat['median']} "
               f"p90={lat['p90']} p95={lat['p95']} p99={lat['p99']} "
               f"max={lat['max']} stdev={lat['stdev']}")
         if lat["stdev"] > lat["avg"] * 0.5 and lat["avg"] > 0:
-            print("    [!] High latency variance (stdev > 50% of avg) — inconsistent response times under load")
+            message = "High latency variance (stdev > 50% of avg) — inconsistent response times under load"
+            print(f"    {colors.warn(message)}")
     if result["sample_errors"]:
         print(f"    Sample errors:     {result['sample_errors']}")

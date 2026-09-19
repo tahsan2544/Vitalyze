@@ -7,6 +7,8 @@ absence the way security_headers does for missing security headers.
 
 import requests
 
+from . import colors
+
 
 def run(url: str, timeout: int = 15) -> dict:
     result = {"success": False, "error": None}
@@ -53,7 +55,8 @@ def run(url: str, timeout: int = 15) -> dict:
 
 def print_result(result: dict) -> None:
     if not result["success"]:
-        print(f"    [x] Caching check failed: {result['error']}")
+        message = f"Caching check failed: {result['error']}"
+        print(f"    {colors.bad(message)}")
         return
 
     print(f"    Cache-Control:    {result['cache_control_raw'] or 'not set'}")
@@ -63,4 +66,5 @@ def print_result(result: dict) -> None:
     print(f"    ETag:             {result['etag'] or 'not set'}")
     print(f"    Last-Modified:    {result['last_modified'] or 'not set'}")
     print(f"    Vary:             {result['vary'] or 'not set'}")
-    print(f"    Cacheable:        {'yes' if result['is_cacheable'] else 'no'}")
+    cacheable_text = colors.ok("yes") if result["is_cacheable"] else "no"
+    print(f"    Cacheable:        {cacheable_text}")
