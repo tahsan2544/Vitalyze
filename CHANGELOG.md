@@ -1,5 +1,52 @@
 # Changelog
 
+## v2.5.0
+
+**Accuracy pass** — the three fixes identified while reviewing v2.4, all
+finished and tested, per explicit "accuracy over features" direction.
+
+### Fixed
+- **SEO checks now use a real HTML parser** (`html.parser.HTMLParser`,
+  standard library) instead of regex. The old regex silently returned
+  `None` for a meta description when attributes were in reversed order
+  (`content` before `name`) or unquoted — both valid, common HTML that a
+  regex anchored on a specific attribute order/quoting gets wrong. Proven
+  with a before/after test showing the exact failure.
+- **Security headers now score content quality, not just presence.** A
+  wide-open `Content-Security-Policy: default-src *` used to score
+  identically to a properly scoped one. `_assess_header_quality()` now
+  checks for known-bad patterns per header (wildcard CSP sources,
+  unsafe-inline/unsafe-eval, a too-short HSTS max-age, a wrong
+  X-Content-Type-Options value, deprecated X-Frame-Options values,
+  unsafe-url Referrer-Policy) and reduces that header's contribution to
+  the score accordingly, with the reason shown in console output.
+- **Response time now also measures connection reuse.** Every phase
+  measurement forces `Connection: close`, paying a full DNS+TCP+TLS
+  handshake per request — a real "worst case first visit" number, but not
+  what a browser experiences reusing a connection. A new "warm" section
+  (`timing.run_session()`) measures N requests over ONE kept-alive
+  connection and reports both numbers side by side, with a plain-language
+  note on the speedup.
+
+### Added
+- `scripts/bump_version.py` + `githooks/pre-commit` — a version
+  auto-bump tool. One-time setup: `git config core.hooksPath githooks`.
+  After that, every commit bumps the patch version automatically and
+  stages it into that same commit. Pure Python, no shell-specific syntax,
+  tested end-to-end in a real git repo (not just mocked) across two
+  consecutive commits.
+- 45 new tests across `test_seo_basics.py` (13), the security-headers
+  quality logic (15 new cases in `test_security_headers.py`),
+  `test_response_time.py` (5, new file), `run_session` coverage in
+  `test_timing.py` (5 new cases), and `test_bump_version.py` (7, new file).
+  130 tests total, all still mocked/temp-file based — no live network
+  required anywhere in the suite.
+
+### Changed
+- README rewritten with per-platform command blocks (Linux/macOS,
+  Windows, Termux) instead of one generic set of commands, author credit,
+  and the version-automator setup documented.
+
 ## v2.4.0
 
 **Webhook/Slack alerts** — the last of the originally requested feature

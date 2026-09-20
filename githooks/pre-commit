@@ -1,0 +1,28 @@
+#!/bin/sh
+# Auto-bumps the patch version in vitalyze/__init__.py on every commit.
+#
+# This is a tracked file, not a real git hook by itself — git only runs
+# hooks from .git/hooks/ (untracked) by default. Point git at this folder
+# once per clone with:
+#     git config core.hooksPath githooks
+# After that, this runs automatically before every `git commit`, on Linux,
+# macOS, Windows (Git Bash), and Termux alike.
+
+# Prefer python3, fall back to python (some systems, notably a few Windows
+# installs, only have the latter on PATH).
+if command -v python3 >/dev/null 2>&1; then
+    PYTHON=python3
+elif command -v python >/dev/null 2>&1; then
+    PYTHON=python
+else
+    echo "[pre-commit] No python3/python found on PATH — skipping version bump."
+    exit 0
+fi
+
+"$PYTHON" scripts/bump_version.py
+
+# Stage the bumped file so it's included in the commit that's about to
+# happen, rather than showing up as an unstaged change right after.
+git add vitalyze/__init__.py
+
+exit 0

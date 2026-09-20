@@ -1,6 +1,13 @@
-"""Basic on-page SEO and crawlability checks."""
+"""Basic on-page SEO and crawlability checks.
 
-import re
+Uses html.parser.HTMLParser (standard library) instead of regex for
+extracting title/meta/canonical/H1 — a real (if lightweight) parser
+handles attribute order, quote style, self-closing tags, and case
+variations that a regex pattern will quietly get wrong on real-world,
+slightly-imperfect HTML.
+"""
+
+from html.parser import HTMLParser
 from urllib.parse import urljoin
 
 import requests
@@ -8,25 +15,65 @@ import requests
 from . import colors
 
 
+class _SEOHTMLParser(HTMLParser):
+    """Extracts exactly the handful of tags SEO checks care about, tolerant
+    of the malformed-but-common HTML real sites actually ship."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.h1_count = 0
+        self.has_viewport_meta = False
+        self.has_canonical = False
+        self.meta_description = None
+        self._in_title = False
+        self._title_parts = []
+
+    def handle_starttag(self, tag, attrs):
+        tag = tag.lower()
+        attrs_dict = {k.lower(): (v or "") for k, v in attrs}
+
+        if tag == "title":
+            self._in_title = True
+        elif tag == "meta":
+            name = attrs_dict.get("name", "").lower()
+            if name == "description" and self.meta_description is None:
+                self.meta_description = attrs_dict.get("content")
+            elif name == "viewport":
+                self.has_viewport_meta = True
+        elif tag == "h1":
+            self.h1_count += 1
+        elif tag == "link":
+            rel = attrs_dict.get("rel", "").lower()
+            if rel == "canonical":
+                self.has_canonical = True
+
+    # handle_startendtag (e.g. <meta ... />) delegates to handle_starttag +
+    # handle_endtag by default — no override needed for void/self-closed tags.
+
+    def handle_endtag(self, tag):
+        if tag.lower() == "title":
+            self._in_title = False
+
+    def handle_data(self, data):
+        if self._in_title:
+            self._title_parts.append(data)
+
+    @property
+    def title(self):
+        joined = "".join(self._title_parts).strip()
+        return joined or None
+
+
 def run(url: str, timeout: int = 15) -> dict:
     result = {"success": False, "error": None}
 
     try:
         resp = requests.get(url, timeout=timeout)
-        html = resp.text
+        parser = _SEOHTMLParser()
+        parser.feed(resp.text)
 
-        title_match = re.search(r"<title[^>]*>(.*?)</title>", html, re.IGNORECASE | re.DOTALL)
-        title = title_match.group(1).strip() if title_match else None
-
-        desc_match = re.search(
-            r'<meta[^>]+name=["\']description["\'][^>]+content=["\'](.*?)["\']',
-            html, re.IGNORECASE
-        )
-        description = desc_match.group(1).strip() if desc_match else None
-
-        h1_count = len(re.findall(r"<h1[\s>]", html, re.IGNORECASE))
-        viewport = bool(re.search(r'<meta[^>]+name=["\']viewport["\']', html, re.IGNORECASE))
-        canonical = bool(re.search(r'<link[^>]+rel=["\']canonical["\']', html, re.IGNORECASE))
+        title = parser.title
+        description = parser.meta_description.strip() if parser.meta_description else None
 
         robots_url = urljoin(url, "/robots.txt")
         sitemap_url = urljoin(url, "/sitemap.xml")
@@ -39,9 +86,9 @@ def run(url: str, timeout: int = 15) -> dict:
             "title_length": len(title) if title else 0,
             "meta_description": description,
             "meta_description_length": len(description) if description else 0,
-            "h1_count": h1_count,
-            "has_viewport_meta": viewport,
-            "has_canonical": canonical,
+            "h1_count": parser.h1_count,
+            "has_viewport_meta": parser.has_viewport_meta,
+            "has_canonical": parser.has_canonical,
             "robots_txt_found": robots_ok,
             "sitemap_xml_found": sitemap_ok,
         })

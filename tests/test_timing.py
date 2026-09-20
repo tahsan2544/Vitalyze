@@ -88,6 +88,84 @@ def test_single_request_rejects_unparseable_url():
     assert result["success"] is False
 
 
+# --- run_session: connection-reuse (keep-alive) timing ---
+
+def _fake_session_response(status=200, connection_header=""):
+    r = mock.MagicMock()
+    r.status = status
+    r.reason = "OK"
+    r.version = 11
+    r.read.return_value = b"x" * 500
+    r.getheader.return_value = connection_header
+    return r
+
+
+def test_run_session_first_cold_rest_warm():
+    fake_conn = mock.MagicMock()
+    fake_conn.timings = {"dns_ms": 5.0, "tcp_connect_ms": 10.0, "tls_handshake_ms": 20.0}
+    fake_conn.getresponse.side_effect = [
+        _fake_session_response(), _fake_session_response(), _fake_session_response()
+    ]
+
+    with mock.patch("vitalyze.timing.TimedHTTPSConnection", return_value=fake_conn):
+        results = timing.run_session("https://example.com/", runs=3)
+
+    assert len(results) == 3
+    assert results[0]["warm"] is False
+    assert results[1]["warm"] is True
+    assert results[2]["warm"] is True
+    assert results[0]["dns_ms"] == 5.0
+    assert results[1]["dns_ms"] is None
+    assert results[2]["tcp_connect_ms"] is None
+    assert fake_conn.putrequest.call_count == 3
+
+
+def test_run_session_stops_when_server_sends_connection_close():
+    fake_conn = mock.MagicMock()
+    fake_conn.timings = {"dns_ms": 1.0, "tcp_connect_ms": 1.0, "tls_handshake_ms": 1.0}
+    fake_conn.getresponse.side_effect = [
+        _fake_session_response(), _fake_session_response(connection_header="close")
+    ]
+
+    with mock.patch("vitalyze.timing.TimedHTTPSConnection", return_value=fake_conn):
+        results = timing.run_session("https://example.com/", runs=5)
+
+    assert len(results) == 2, "should stop after the server announces it's closing"
+
+
+def test_run_session_handles_broken_connection_mid_session():
+    fake_conn = mock.MagicMock()
+    fake_conn.timings = {"dns_ms": 1.0, "tcp_connect_ms": 1.0, "tls_handshake_ms": 1.0}
+    fake_conn.getresponse.side_effect = [
+        _fake_session_response(), _fake_session_response(), ConnectionResetError("reset")
+    ]
+
+    with mock.patch("vitalyze.timing.TimedHTTPSConnection", return_value=fake_conn):
+        results = timing.run_session("https://example.com/", runs=5)
+
+    assert len(results) == 3
+    assert results[0]["success"] and results[1]["success"]
+    assert results[2]["success"] is False
+    assert results[2]["warm"] is True, "a failure after successful requests should still be marked warm"
+
+
+def test_run_session_single_run_has_no_warm_entries():
+    fake_conn = mock.MagicMock()
+    fake_conn.timings = {"dns_ms": 1.0, "tcp_connect_ms": 1.0, "tls_handshake_ms": None}
+    fake_conn.getresponse.side_effect = [_fake_session_response()]
+
+    with mock.patch("vitalyze.timing.TimedHTTPConnection", return_value=fake_conn):
+        results = timing.run_session("http://example.com/", runs=1)
+
+    assert len(results) == 1
+    assert results[0]["warm"] is False
+
+
+def test_run_session_rejects_unparseable_url():
+    results = timing.run_session("not a url")
+    assert results[0]["success"] is False
+
+
 if __name__ == "__main__":
     import inspect
     funcs = [f for name, f in inspect.getmembers(sys.modules[__name__], inspect.isfunction)
