@@ -89,6 +89,40 @@ def test_redirects_score_penalizes_many_hops():
     assert report.score(results)["redirects"] == 40
 
 
+def test_mixed_content_score_clean_page():
+    results = {"mixed_content": {"success": True, "applicable": True, "mixed_count": 0}}
+    assert report.score(results)["mixed_content"] == 100
+
+
+def test_mixed_content_score_penalized_per_resource():
+    results = {"mixed_content": {"success": True, "applicable": True, "mixed_count": 3}}
+    assert report.score(results)["mixed_content"] == 40  # 100 - 3*20
+
+
+def test_mixed_content_not_scored_when_not_applicable():
+    """An HTTP page (mixed content doesn't apply) should get no score at
+    all, not a misleading 100 or 0."""
+    results = {"mixed_content": {"success": True, "applicable": False}}
+    assert "mixed_content" not in report.score(results)
+
+
+def test_accessibility_score_full_lang_and_alt():
+    results = {"accessibility": {"success": True, "has_lang_attribute": True, "alt_text_coverage_pct": 100}}
+    assert report.score(results)["accessibility"] == 100
+
+
+def test_accessibility_score_missing_lang_averages_down():
+    results = {"accessibility": {"success": True, "has_lang_attribute": False, "alt_text_coverage_pct": 100}}
+    assert report.score(results)["accessibility"] == 50  # (0 + 100) / 2
+
+
+def test_social_meta_never_contributes_a_score():
+    """Deliberate design choice — see social_meta.py's docstring."""
+    results = {"social": {"success": True, "has_basic_og": False, "has_twitter_card": False}}
+    scores = report.score(results)
+    assert "social" not in scores
+
+
 def test_load_test_score_handles_all_requests_failed():
     """latency_ms is None when every request in the load test failed —
     scoring must not crash trying to read .get('avg') off None."""

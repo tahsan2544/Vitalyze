@@ -66,6 +66,27 @@ def score(results: dict) -> dict:
         hop_penalty = {0: 0, 1: 10, 2: 25, 3: 40}.get(redir["hop_count"], 60)
         scores["redirects"] = max(0, 100 - hop_penalty)
 
+    # Mixed content score: steep penalty since this is a real, user-visible
+    # browser warning/block, not a cosmetic issue. Not applicable on a
+    # non-HTTPS page — no score there rather than a misleading 100 or 0.
+    mixed = results.get("mixed_content", {})
+    if mixed.get("success") and mixed.get("applicable", True):
+        scores["mixed_content"] = max(0, 100 - mixed.get("mixed_count", 0) * 20)
+
+    # Accessibility score: lang attribute (binary) averaged with alt-text
+    # coverage (already 0-100) — both objectively checkable, no heuristic
+    # guessing about actual usability involved.
+    a11y = results.get("accessibility", {})
+    if a11y.get("success"):
+        lang_score = 100 if a11y.get("has_lang_attribute") else 0
+        alt_score = a11y.get("alt_text_coverage_pct", 100)
+        scores["accessibility"] = round((lang_score + alt_score) / 2)
+
+    # Social meta tags (Open Graph/Twitter Card) are deliberately NOT
+    # scored — see social_meta.py's docstring: this is a presentation gap,
+    # not a site defect, and folding it into "site health" would dilute
+    # what that score is supposed to mean.
+
     # Load test score (only if run)
     load = results.get("load_test")
     if load:

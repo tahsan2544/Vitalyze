@@ -1,5 +1,46 @@
 # Changelog
 
+## v2.6.0
+
+**More checks, same accuracy bar.** Four new features, each objectively
+checkable — no heuristics, no guessing — per explicit "more features but
+keep accuracy" direction.
+
+### Added
+- `vitalyze/mixed_content.py` — detects HTTP resources (images, scripts,
+  stylesheets, iframes, audio/video) loaded on an HTTPS page, the exact
+  thing browsers warn or block on. Correctly does NOT flag
+  protocol-relative URLs (`//cdn.example.com/x.png`), which inherit the
+  page's own scheme per RFC 3986 — verified with a dedicated test.
+  Scored: 100 minus 20 per mixed resource found; not scored at all on a
+  non-HTTPS page (not applicable, not a 0 or 100).
+- `vitalyze/social_meta.py` — Open Graph and Twitter Card tag detection.
+  Deliberately informational only, no score contribution: a missing
+  `og:image` is a marketing gap, not a site defect, and scoring it would
+  dilute what the health score means.
+- `vitalyze/accessibility.py` — `<html lang>` attribute presence and image
+  alt-text coverage. Scored as the average of both (lang is binary,
+  100/0; alt coverage is already 0-100).
+- HTTP/2 detection in `ssl_check.py` via ALPN (`ssl.set_alpn_protocols`
+  during the TLS handshake) — reports what protocol the server actually
+  negotiated, not a guess. `ssl_check.py` also got its first dedicated
+  test file (`test_ssl_check.py`, 7 tests) — it was previously only
+  covered indirectly through mocked `main.py` integration tests.
+- 36 new tests: `test_mixed_content.py` (10), `test_social_meta.py` (5),
+  `test_accessibility.py` (8), `test_ssl_check.py` (7), plus 6 new scoring
+  tests in `test_report.py` covering the mixed-content/accessibility
+  scoring formulas and confirming social tags never contribute a score.
+  166 tests total.
+
+### Changed
+- `--skip` now accepts `mixed_content`, `social`, `accessibility` alongside
+  the existing categories.
+- All three new checks run against the redirect-resolved final URL, same
+  as every other content check, confirmed via a full `main.py`
+  integration test (step numbering, `--skip` behavior, and scoring
+  inclusion/exclusion all verified end-to-end, not just at the module
+  level).
+
 ## v2.5.0
 
 **Accuracy pass** — the three fixes identified while reviewing v2.4, all

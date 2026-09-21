@@ -32,6 +32,9 @@ from vitalyze import ssl_check
 from vitalyze import security_headers
 from vitalyze import caching
 from vitalyze import seo_basics
+from vitalyze import mixed_content
+from vitalyze import social_meta
+from vitalyze import accessibility
 from vitalyze import load_test
 from vitalyze import report
 from vitalyze import config as config_module
@@ -47,7 +50,10 @@ BANNER = r"""
 ========================================
 """
 
-ALL_CATEGORIES = ["dns", "redirects", "response", "ssl", "headers", "caching", "seo"]
+ALL_CATEGORIES = [
+    "dns", "redirects", "response", "ssl", "headers", "caching", "seo",
+    "mixed_content", "social", "accessibility",
+]
 
 
 def normalize_url(raw: str) -> str:
@@ -282,6 +288,33 @@ def main():
         results["seo"] = seo_basics.run(analysis_url)
         if console:
             seo_basics.print_result(results["seo"])
+        step += 1
+
+    # --- Mixed content (HTTP resources on an HTTPS page) ---
+    if "mixed_content" not in args.skip:
+        if console:
+            print(f"\n[{step}] Mixed Content")
+        results["mixed_content"] = mixed_content.run(analysis_url)
+        if console:
+            mixed_content.print_result(results["mixed_content"])
+        step += 1
+
+    # --- Social meta tags (Open Graph / Twitter Card) — informational only ---
+    if "social" not in args.skip:
+        if console:
+            print(f"\n[{step}] Social Meta Tags")
+        results["social"] = social_meta.run(analysis_url)
+        if console:
+            social_meta.print_result(results["social"])
+        step += 1
+
+    # --- Accessibility basics ---
+    if "accessibility" not in args.skip:
+        if console:
+            print(f"\n[{step}] Accessibility")
+        results["accessibility"] = accessibility.run(analysis_url)
+        if console:
+            accessibility.print_result(results["accessibility"])
         step += 1
 
     # --- Load test (opt-in, gated; hits the original target, redirects included) ---

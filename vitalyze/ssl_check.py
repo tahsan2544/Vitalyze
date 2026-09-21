@@ -20,11 +20,15 @@ def run(netloc: str, timeout: int = 10) -> dict:
 
     try:
         ctx = ssl.create_default_context()
+        # Advertise HTTP/2 support via ALPN so we can see what the server
+        # actually negotiates — an objective fact, not a guess.
+        ctx.set_alpn_protocols(["h2", "http/1.1"])
         with socket.create_connection((host, port), timeout=timeout) as sock:
             with ctx.wrap_socket(sock, server_hostname=host) as ssock:
                 cert = ssock.getpeercert()
                 protocol = ssock.version()
                 cipher = ssock.cipher()
+                alpn_protocol = ssock.selected_alpn_protocol()
 
         not_after = datetime.strptime(cert["notAfter"], "%b %d %H:%M:%S %Y %Z").replace(tzinfo=timezone.utc)
         not_before = datetime.strptime(cert["notBefore"], "%b %d %H:%M:%S %Y %Z").replace(tzinfo=timezone.utc)
@@ -37,6 +41,8 @@ def run(netloc: str, timeout: int = 10) -> dict:
             "success": True,
             "protocol": protocol,
             "cipher_suite": cipher[0] if cipher else None,
+            "alpn_protocol": alpn_protocol,
+            "http2_supported": alpn_protocol == "h2",
             "issued_to": subject.get("commonName"),
             "issued_by": issuer.get("organizationName") or issuer.get("commonName"),
             "valid_from": not_before.isoformat(),
@@ -62,6 +68,8 @@ def print_result(result: dict) -> None:
     else:
         print(f"    {colors.ok('Certificate valid')}")
     print(f"    Protocol:       {result['protocol']} ({result['cipher_suite']})")
+    http2_text = colors.ok("yes") if result["http2_supported"] else "no"
+    print(f"    HTTP/2:         {http2_text}")
     print(f"    Issued to:      {result['issued_to']}")
     print(f"    Issued by:      {result['issued_by']}")
     print(f"    Valid until:    {result['valid_until']} ({result['days_remaining']} days remaining)")

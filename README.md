@@ -8,7 +8,7 @@ Made by **Tahsan Ahmed**.
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Python](https://img.shields.io/badge/python-3.8%2B-blue)
 ![Status](https://img.shields.io/badge/status-active-brightgreen)
-![Version](https://img.shields.io/badge/version-2.5.0-orange)
+![Version](https://img.shields.io/badge/version-2.6.0-orange)
 
 ```
 ========================================
@@ -58,6 +58,10 @@ Three real correctness gaps got fixed, not just new checkboxes added:
 | 🔔 **Webhook/Slack alerts** | `--webhook` notifies you, only on a real regression by default |
 | 🎨 **Colored console output** | ✓/✗/⚠ icons, color-coded scores, a plain-language verdict line — auto-disables when piping to a file or via `--no-color` |
 | 🔢 **Auto-versioning** | A git hook bumps the patch version on every commit automatically |
+| 🔓 **Mixed content detection** | Flags HTTP resources on an HTTPS page — objective, not a guess |
+| ♿ **Accessibility basics** | `<html lang>` attribute + image alt-text coverage, scored |
+| 📢 **Social meta tags** | Open Graph / Twitter Card presence — informational, not scored (see reasoning in the module) |
+| 🌐 **HTTP/2 detection** | Via ALPN during the TLS handshake — reports what actually got negotiated |
 
 ---
 
@@ -68,10 +72,13 @@ Three real correctness gaps got fixed, not just new checkboxes added:
 | 🌐 **DNS** | Resolution time, resolved IP addresses |
 | 🔀 **Redirects** | Hop-by-hop chain, per-hop timing, loop detection, HTTP→HTTPS upgrade |
 | ⚡ **Response Time** | DNS / TCP connect / TLS handshake / TTFB / download, cold *and* warm (connection-reused), each with full percentile stats |
-| 🔒 **SSL/TLS** | Certificate issuer, protocol & cipher, days until expiry |
+| 🔒 **SSL/TLS** | Certificate issuer, protocol & cipher, days until expiry, HTTP/2 support (via ALPN) |
 | 🛡️ **Security Headers** | HSTS, CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy — presence *and* content quality — plus cookie flag hygiene |
 | 📦 **Caching** | Cache-Control directives, ETag, Last-Modified, Vary, cacheability |
 | 🔎 **SEO Basics** | Title/meta length, H1 count, viewport meta, canonical tag, robots.txt, sitemap.xml — via a real HTML parser |
+| 🔓 **Mixed Content** | HTTP resources (images, scripts, stylesheets, iframes, media) loaded on an HTTPS page — exactly what browsers warn or block on |
+| 📢 **Social Meta Tags** | Open Graph and Twitter Card tags — how the page looks when shared on social media (informational, not scored) |
+| ♿ **Accessibility** | `<html lang>` attribute, image alt-text coverage |
 | 🚦 **Load Test** *(opt-in)* | Requests/sec, error rate, latency percentiles + stdev under capped concurrency |
 
 Every category gets a **0–100 score** and a **letter grade**, rolled up into one overall grade.
@@ -206,7 +213,7 @@ This bumps the **patch** number only, on *every* commit — including docs-only 
 |---|---|---|
 | `url` | — | Target URL (required), e.g. `https://example.com` |
 | `--runs` | `5` | Requests to average for response-time stats |
-| `--skip` | none | Skip categories: `dns` `redirects` `response` `ssl` `headers` `caching` `seo` |
+| `--skip` | none | Skip categories: `dns` `redirects` `response` `ssl` `headers` `caching` `seo` `mixed_content` `social` `accessibility` |
 | `--load-test` | off | Run a capped, rate-limited load test |
 | `--confirm-authorized` | off | Required with `--load-test` — confirms you're authorized |
 | `--concurrency` | `5` | Load test workers (🔒 hard-capped at **20**) |
@@ -304,6 +311,9 @@ SUMMARY
 | `vitalyze/security_headers.py` | Security header presence + content-quality scoring, cookie flag analysis |
 | `vitalyze/caching.py` | Cache-Control/ETag/Last-Modified analysis |
 | `vitalyze/seo_basics.py` | On-page SEO checks via a real HTML parser |
+| `vitalyze/mixed_content.py` | Detects HTTP resources loaded on an HTTPS page |
+| `vitalyze/social_meta.py` | Open Graph / Twitter Card tag detection (informational) |
+| `vitalyze/accessibility.py` | `<html lang>` attribute and image alt-text coverage |
 | `vitalyze/config.py` | JSON config file load/save (`--config`/`--save-config`) |
 | `vitalyze/history.py` | SQLite-backed run history, trend comparison (`--trend`/`--show-history`) |
 | `vitalyze/colors.py` | ANSI color helpers for console output (auto-detects TTY, respects `NO_COLOR`) |
@@ -312,7 +322,7 @@ SUMMARY
 | `vitalyze/report.py` | Scoring, letter grades, JSON/HTML export |
 | `scripts/bump_version.py` | Version auto-bump logic, called by the pre-commit hook |
 | `githooks/pre-commit` | Git hook: bumps the version and stages it on every commit |
-| `tests/` | Unit tests (130 tests, all mocked/temp-file based — no real network needed) |
+| `tests/` | Unit tests (166 tests, all mocked/temp-file based — no real network needed) |
 | `.github/workflows/ci.yml` | Auto-runs tests on push/PR |
 | `ETHICAL_USE.md` | Responsible-use policy — read before load testing |
 
@@ -325,7 +335,7 @@ pip install pytest
 python -m pytest tests/ -v
 ```
 
-All 130 tests run against mocked sockets/HTTP responses or real temp files — no live network calls anywhere, so they pass in CI or fully offline exactly the same way.
+All 166 tests run against mocked sockets/HTTP responses or real temp files — no live network calls anywhere, so they pass in CI or fully offline exactly the same way.
 
 ---
 
