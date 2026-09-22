@@ -8,7 +8,7 @@ Made by **Tahsan Ahmed**.
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Python](https://img.shields.io/badge/python-3.8%2B-blue)
 ![Status](https://img.shields.io/badge/status-active-brightgreen)
-![Version](https://img.shields.io/badge/version-2.6.0-orange)
+![Version](https://img.shields.io/badge/version-2.7.0-orange)
 
 ```
 ========================================
@@ -152,6 +152,20 @@ python main.py https://yoursite.com --load-test --confirm-authorized \
     --concurrency 10 --requests 100
 ```
 
+**Or run for a fixed duration instead of a fixed request count:**
+```bash
+python main.py https://yoursite.com --load-test --confirm-authorized \
+    --concurrency 10 --duration 30
+```
+
+**Ease into full load gradually instead of an instant spike:**
+```bash
+python main.py https://yoursite.com --load-test --confirm-authorized \
+    --concurrency 10 --duration 30 --ramp-up 10
+```
+
+The load test auto-stops if the error rate crosses 90% (`--abort-threshold` to change it, `--no-abort` to disable) — if your target is already struggling, sending more traffic doesn't tell you anything new. Each simulated worker also keeps a persistent, reused connection for its requests (not a fresh TCP+TLS handshake every time), so this measures realistic concurrent-user behavior rather than the cost of repeated cold connections.
+
 **Save your settings so you don't retype them:**
 ```bash
 python main.py https://yoursite.com --runs 10 --skip seo --save-config vitalyze.config.json
@@ -217,7 +231,11 @@ This bumps the **patch** number only, on *every* commit — including docs-only 
 | `--load-test` | off | Run a capped, rate-limited load test |
 | `--confirm-authorized` | off | Required with `--load-test` — confirms you're authorized |
 | `--concurrency` | `5` | Load test workers (🔒 hard-capped at **20**) |
-| `--requests` | `50` | Load test total requests (🔒 hard-capped at **500**) |
+| `--requests` | `50` | Load test total requests (🔒 hard-capped at **500**) — ignored if `--duration` is given |
+| `--duration` | none | Load test: run for N seconds instead of a fixed count (🔒 hard-capped at **60s**) |
+| `--ramp-up` | `0` | Load test: seconds to gradually reach full concurrency (🔒 hard-capped at **30s**) |
+| `--abort-threshold` | `90` | Load test: auto-stop if the error rate reaches this percent |
+| `--no-abort` | off | Disable the load test's auto-abort-on-high-error-rate behavior |
 | `--output` | `console` | `console`, `json`, or `html` |
 | `--save` | none | File path to save the JSON/HTML report |
 | `--config` | none | Load settings from a JSON config file (auto-detects `./vitalyze.config.json`) |
@@ -318,11 +336,11 @@ SUMMARY
 | `vitalyze/history.py` | SQLite-backed run history, trend comparison (`--trend`/`--show-history`) |
 | `vitalyze/colors.py` | ANSI color helpers for console output (auto-detects TTY, respects `NO_COLOR`) |
 | `vitalyze/alerts.py` | Slack/webhook notifications on score regression (`--webhook`) |
-| `vitalyze/load_test.py` | 🔒 Capped, single-target load test |
+| `vitalyze/load_test.py` | 🔒 Capped, single-target load test — session reuse, duration/count modes, ramp-up, auto-abort |
 | `vitalyze/report.py` | Scoring, letter grades, JSON/HTML export |
 | `scripts/bump_version.py` | Version auto-bump logic, called by the pre-commit hook |
 | `githooks/pre-commit` | Git hook: bumps the version and stages it on every commit |
-| `tests/` | Unit tests (166 tests, all mocked/temp-file based — no real network needed) |
+| `tests/` | Unit tests (189 tests, all mocked/temp-file based — no real network needed) |
 | `.github/workflows/ci.yml` | Auto-runs tests on push/PR |
 | `ETHICAL_USE.md` | Responsible-use policy — read before load testing |
 
@@ -335,7 +353,7 @@ pip install pytest
 python -m pytest tests/ -v
 ```
 
-All 166 tests run against mocked sockets/HTTP responses or real temp files — no live network calls anywhere, so they pass in CI or fully offline exactly the same way.
+All 189 tests run against mocked sockets/HTTP responses or real temp files — no live network calls anywhere, so they pass in CI or fully offline exactly the same way.
 
 ---
 

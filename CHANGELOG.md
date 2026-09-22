@@ -1,5 +1,55 @@
 # Changelog
 
+## v2.7.0
+
+**Better load tester** — rebuilt on request, with a real accuracy fix
+found along the way plus a real bug caught by the new tests themselves.
+
+### Fixed
+- **Connection reuse**: every load-test request previously used
+  `requests.get()`, which creates a brand-new `Session()` (and therefore a
+  fresh TCP+TLS handshake) on every single call — even from the same
+  worker. That measured "how fast can we do repeated cold handshakes," not
+  concurrent-user behavior. Each of the `concurrency` workers now keeps
+  one persistent `requests.Session()` (via `threading.local()`), reusing
+  its connection across its own requests — a more accurate simulation of
+  `concurrency` real concurrent users, and it also means genuinely higher
+  achievable throughput numbers where the target supports keep-alive.
+- **Sub-second duration bug**: an early version of the new `--duration`
+  mode floored any duration to a minimum of 1 full second
+  (`max(duration_seconds, 1)`), so a requested 0.3s test silently ran for
+  1s instead. Caught by a test asserting on actual wall-clock time, not
+  just the reported number — fixed to floor at 0.1s instead.
+
+### Added
+- `--duration N` — run the load test for N seconds instead of a fixed
+  request count (hard-capped at 60s). Each of the `concurrency` workers
+  loops independently until a shared deadline, rather than pulling from a
+  fixed-size queue.
+- `--ramp-up N` — gradually reach full concurrency over N seconds instead
+  of an instant spike (hard-capped at 30s). Worker start times are
+  staggered evenly across the ramp window.
+- `--abort-threshold N` (default 90) / `--no-abort` — the load test now
+  auto-stops if the error rate crosses the threshold after a minimum
+  sample size, rather than continuing to hammer a server that's already
+  struggling or down. On by default; the module-level API itself defaults
+  to no auto-abort (`abort_threshold_pct=None`) so the CLI is the layer
+  that opts into this as a safety default, not the library silently
+  deciding for every caller.
+- 23 new tests in `test_load_test.py`: pure-logic tests for the ramp-up
+  stagger math and the abort decision (fully deterministic, no threading),
+  a real thread-based session-identity test (same session within a
+  thread, different sessions across threads), and real (short,
+  sub-second) concurrent execution tests for count mode, duration mode,
+  ramp-up, and abort — each with generous timing bounds so they aren't
+  flaky on a slower CI machine. 189 tests total.
+
+### Fixed (docs)
+- `ETHICAL_USE.md` had literal unsubstituted `{MAX_CONCURRENCY}` /
+  `{MAX_REQUESTS}` placeholder text instead of the actual numbers — now
+  filled in, and extended to describe the duration/ramp-up caps and the
+  auto-abort safety behavior.
+
 ## v2.6.0
 
 **More checks, same accuracy bar.** Four new features, each objectively

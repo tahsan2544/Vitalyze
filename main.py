@@ -100,6 +100,24 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Load test: total requests to send, hard-capped at 500 (default: 50)"
     )
     parser.add_argument(
+        "--duration", type=int, metavar="SECONDS",
+        help=f"Load test: run for N seconds instead of a fixed request count "
+             f"(hard-capped at {load_test.MAX_DURATION_SECONDS}s). Overrides --requests if both given."
+    )
+    parser.add_argument(
+        "--ramp-up", type=int, default=0, metavar="SECONDS",
+        help=f"Load test: gradually reach full concurrency over N seconds instead of "
+             f"starting at full load instantly (hard-capped at {load_test.MAX_RAMP_UP_SECONDS}s)"
+    )
+    parser.add_argument(
+        "--abort-threshold", type=int, default=90, metavar="PCT",
+        help="Load test: auto-stop early if the error rate reaches this percent (default: 90)"
+    )
+    parser.add_argument(
+        "--no-abort", action="store_true",
+        help="Disable the load test's auto-abort-on-high-error-rate safety behavior"
+    )
+    parser.add_argument(
         "--output", choices=["console", "json", "html"], default="console",
         help="Output format (default: console)"
     )
@@ -329,14 +347,30 @@ def main():
             sys.exit(1)
 
         concurrency = min(max(args.concurrency, 1), load_test.MAX_CONCURRENCY)
-        total_requests = min(max(args.requests, 1), load_test.MAX_REQUESTS)
+        ramp_up = min(max(args.ramp_up, 0), load_test.MAX_RAMP_UP_SECONDS)
+        abort_threshold = None if args.no_abort else args.abort_threshold
 
         if console:
             print(f"\n[{step}] Load Test (capped, rate-limited)")
-            print(f"    concurrency={concurrency}, total_requests={total_requests}")
-        results["load_test"] = load_test.run(
-            target, concurrency=concurrency, total_requests=total_requests
-        )
+            if args.duration:
+                duration = min(max(args.duration, 1), load_test.MAX_DURATION_SECONDS)
+                print(f"    concurrency={concurrency}, duration={duration}s")
+            else:
+                total_requests = min(max(args.requests, 1), load_test.MAX_REQUESTS)
+                print(f"    concurrency={concurrency}, total_requests={total_requests}")
+
+        if args.duration:
+            duration = min(max(args.duration, 1), load_test.MAX_DURATION_SECONDS)
+            results["load_test"] = load_test.run(
+                target, concurrency=concurrency, duration_seconds=duration,
+                ramp_up_seconds=ramp_up, abort_threshold_pct=abort_threshold,
+            )
+        else:
+            total_requests = min(max(args.requests, 1), load_test.MAX_REQUESTS)
+            results["load_test"] = load_test.run(
+                target, concurrency=concurrency, total_requests=total_requests,
+                ramp_up_seconds=ramp_up, abort_threshold_pct=abort_threshold,
+            )
         if console:
             load_test.print_result(results["load_test"])
         step += 1

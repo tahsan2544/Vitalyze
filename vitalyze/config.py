@@ -17,6 +17,7 @@ CONFIGURABLE_KEYS = [
     "concurrency", "requests", "output", "save",
     "history_db", "no_history", "trend", "no_color",
     "webhook", "webhook_format", "alert_threshold", "alert_always",
+    "duration", "ramp_up", "abort_threshold", "no_abort",
 ]
 
 

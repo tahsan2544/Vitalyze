@@ -22,10 +22,16 @@ target didn't agree to be tested.
 
 - Measure response time, TLS health, security headers, and basic SEO
   hygiene for a site — read-only, single-request checks.
-- Run a **capped** concurrent load test (hard limits: {MAX_CONCURRENCY}
-  concurrent workers, {MAX_REQUESTS} total requests — see
-  `vitalyze/load_test.py`) so you can see how your own site's infra behaves
-  under modest simultaneous traffic.
+- Run a **capped** concurrent load test (hard limits: 20 concurrent
+  workers, 500 total requests, 60-second maximum duration, 30-second
+  maximum ramp-up — see `vitalyze/load_test.py`) so you can see how your
+  own site's infra behaves under modest simultaneous traffic.
+- **Auto-abort on a struggling server**: by default, the load test stops
+  itself early if the error rate crosses 90% (`--abort-threshold` to
+  change it, `--no-abort` to disable). If your site is already down or
+  failing, continuing to hammer it with more traffic doesn't tell you
+  anything useful and just makes things worse — this is a genuine safety
+  behavior, not a cosmetic feature.
 
 ## What this tool is not designed to do
 
