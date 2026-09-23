@@ -343,6 +343,8 @@ SUMMARY
 | `tests/` | Unit tests (189 tests, all mocked/temp-file based — no real network needed) |
 | `.github/workflows/ci.yml` | Auto-runs tests on push/PR |
 | `ETHICAL_USE.md` | Responsible-use policy — read before load testing |
+| `CONTRIBUTING.md` | Test workflow and PR rules |
+| `SECURITY.md` | Private vulnerability reporting and scope |
 
 ---
 
@@ -370,7 +372,7 @@ All 189 tests run against mocked sockets/HTTP responses or real temp files — n
 
 ## 🤝 Contributing
 
-Issues and PRs welcome! One rule: PRs that remove the load-test safety caps or add multi-target/subdomain scanning will be declined — see [`ETHICAL_USE.md`](ETHICAL_USE.md) for why.
+Issues and PRs welcome! Read [`CONTRIBUTING.md`](CONTRIBUTING.md) for the test workflow and PR rules. One rule: PRs that remove the load-test safety caps or add multi-target/subdomain scanning will be declined — see [`ETHICAL_USE.md`](ETHICAL_USE.md) for why. Security issues go to [`SECURITY.md`](SECURITY.md), not the public issue tracker.
 
 ---
 
